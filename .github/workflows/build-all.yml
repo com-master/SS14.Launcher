@@ -1,0 +1,86 @@
+name: Build all platforms
+
+on:
+  push:
+    branches:
+      - claude/random-connection-messages-xtl3iy
+  workflow_dispatch:
+
+jobs:
+  # Windows bootstrap must be compiled on a Windows runner.
+  bootstrap-windows:
+    runs-on: windows-2022
+    strategy:
+      matrix:
+        configuration: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish bootstrap
+        working-directory: SS14.Launcher.Bootstrap
+        run: dotnet publish -r win-x64 --configuration ${{ matrix.configuration }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bootstrap-${{ matrix.configuration }}
+          retention-days: 1
+          path: "SS14.Launcher.Bootstrap/bin/${{ matrix.configuration }}/net10.0-windows/win-x64/publish/Space Station 14 Launcher.exe"
+
+  build:
+    runs-on: ubuntu-latest
+    needs: bootstrap-windows
+    strategy:
+      matrix:
+        configuration: [Debug, Release]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build macOS and Linux
+        run: ./publish.py osx linux --configuration ${{ matrix.configuration }}
+
+      - name: Download Windows bootstrap
+        uses: actions/download-artifact@v4
+        with:
+          name: bootstrap-${{ matrix.configuration }}
+
+      - name: Build Windows
+        run: ./publish.py windows --x64-only --configuration ${{ matrix.configuration }}
+
+      - name: Determine archive suffix
+        id: suffix
+        run: |
+          if [ "${{ matrix.configuration }}" = "Release" ]; then
+            echo "val=" >> $GITHUB_OUTPUT
+          else
+            echo "val=_${{ matrix.configuration }}" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SS14.Launcher_Windows_${{ matrix.configuration }}
+          path: SS14.Launcher_Windows${{ steps.suffix.outputs.val }}.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SS14.Launcher_Linux_${{ matrix.configuration }}
+          path: SS14.Launcher_Linux${{ steps.suffix.outputs.val }}.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SS14.Launcher_macOS_${{ matrix.configuration }}
+          path: SS14.Launcher_macOS${{ steps.suffix.outputs.val }}.zip
