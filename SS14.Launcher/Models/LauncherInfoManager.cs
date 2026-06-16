@@ -60,13 +60,7 @@ public sealed class LauncherInfoManager(HttpClient httpClient)
         _model = info;
     }
 
-    public string? GetRandomMessage()
-    {
-        if (_messages == null)
-            return null;
-
-        return _messages[_messageRandom.Next(_messages.Length)];
-    }
+    public string? GetRandomMessage() => null;
 
     public sealed record LauncherInfoModel(
         Dictionary<string, string[]> Messages,
